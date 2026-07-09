@@ -1,4 +1,4 @@
-import { fetchAuthSession } from 'aws-amplify/auth';
+import { getAuthToken } from '@/lib/auth';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -63,7 +63,7 @@ const getRequestHeaders = async (
     headers['Content-Type'] = 'application/json';
   }
   if (withAuth) {
-    const token = (await fetchAuthSession()).tokens?.idToken?.toString();
+    const token = await getAuthToken();
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }

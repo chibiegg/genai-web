@@ -1,6 +1,7 @@
 import { InvokeWithResponseStreamCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import { fromCognitoIdentityPool } from '@aws-sdk/credential-provider-cognito-identity';
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { authProvider, getAuthToken } from '@/lib/auth';
 import {
   CreateChatResponse,
   CreateMessagesRequest,
@@ -43,7 +44,45 @@ export const predict = async (req: PredictRequest): Promise<string> => {
   return res.data;
 };
 
+// OIDC 構成では API サーバの /predict/stream（JSONL の HTTP ストリーミング）を利用する。
+// Lambda Response Streaming の直接呼び出し（Cognito 構成）の代替。
+async function* predictStreamHttp(req: PredictRequest) {
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error('認証されていません。');
+  }
+
+  const base = (import.meta.env.VITE_APP_API_ENDPOINT as string).replace(/\/+$/, '');
+  const res = await fetch(`${base}/predict/stream`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(req),
+  });
+
+  if (!res.ok || !res.body) {
+    throw new Error(`ストリーミングリクエストに失敗しました (${res.status})`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    yield decoder.decode(value, { stream: true });
+  }
+}
+
 export async function* predictStream(req: PredictRequest) {
+  if (authProvider === 'oidc') {
+    yield* predictStreamHttp(req);
+    return;
+  }
+
   const token = (await fetchAuthSession()).tokens?.idToken?.toString();
   if (!token) {
     throw new Error('認証されていません。');

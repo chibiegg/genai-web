@@ -8,6 +8,7 @@ import { Logo } from '@/components/ui/Logo';
 import { MobileMenu } from '@/components/ui/mobile-menu/MobileMenu';
 import { useAuth } from '@/hooks/useAuth';
 import { useMobileMenuHandler } from '@/layout/hooks/useMobileMenuHandler';
+import { authProvider, signOutUser } from '@/lib/auth';
 
 type Props = {
   className?: string;
@@ -20,7 +21,7 @@ export const Header = (props: Props) => {
 
   const { data } = useAuth();
   const groups =
-    (data?.tokens?.accessToken.payload['cognito:groups'] as unknown as string[] | undefined) ?? [];
+    (data?.tokens?.accessToken?.payload['cognito:groups'] as unknown as string[] | undefined) ?? [];
 
   const { cache } = useSWRConfig();
   const { signOut } = useAuthenticator();
@@ -30,6 +31,11 @@ export const Header = (props: Props) => {
     // SWRのキャッシュを全て削除する
     for (const key of cache.keys()) {
       cache.delete(key);
+    }
+    if (authProvider === 'oidc') {
+      // OIDC は IdP のログアウトへリダイレクトする（post_logout で /signed-out に戻る）
+      void signOutUser();
+      return;
     }
     navigate('/signed-out', { replace: true });
     signOut();
