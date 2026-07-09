@@ -12,8 +12,10 @@
     "lint": "biome lint lib && biome lint lambda"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.2.17",
     "@types/aws-lambda": "^8.10.162",
     "@types/node": "^25.9.3",
+    "@types/pg": "^8.11.10",
     "aws-cdk": "^2.1127.0",
     "aws-sdk-client-mock": "^4.1.0",
     "ts-node": "^10.9.2"
@@ -46,6 +48,7 @@
     "aws-jwt-verify": "^5.2.1",
     "cdk-nag": "^2.38.2",
     "constructs": "^10.6.0",
-    "ipaddr.js": "^2.4.0"
+    "ipaddr.js": "^2.4.0",
+    "pg": "^8.13.1"
   }
 }

@@ -1,0 +1,21 @@
+{
+  "name": "server",
+  "private": true,
+  "description": "源内 Web API サーバ（AWS 非依存構成）。Lambda ハンドラを HTTP アダプタ経由で常駐プロセスとして提供する。",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "hono": "^4.6.14",
+    "jose": "^5.9.6",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "vitest": "^4.1.9"
+  }
+}

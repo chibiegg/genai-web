@@ -1,19 +1,14 @@
-import {
-  BatchWriteCommand,
-  DeleteCommand,
-  PutCommand,
-  QueryCommand,
-  UpdateCommand,
-} from '@aws-sdk/lib-dynamodb';
 import * as crypto from 'crypto';
 import { Chat, ListChatsResponse } from 'genai-web';
-import { dynamoDbDocument, TABLE_NAME, TTL_DAYS } from './client';
+import { calcExpireAt, getDb, ITEMS_TABLE } from './db';
 import { listMessages } from './messageRepository';
+
+const LIST_CHATS_LIMIT = 100;
 
 export const createChat = async (_userId: string): Promise<Chat> => {
   const userId = `user#${_userId}`;
   const chatId = `chat#${crypto.randomUUID()}`;
-  const expire_at = Math.floor(Date.now() / 1000) + TTL_DAYS * 24 * 60 * 60;
+  const expire_at = calcExpireAt();
   const item = {
     id: userId,
     createdDate: `${Date.now()}`,
@@ -24,11 +19,10 @@ export const createChat = async (_userId: string): Promise<Chat> => {
     expire_at,
   };
 
-  await dynamoDbDocument.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: item,
-    }),
+  await getDb().query(
+    `INSERT INTO ${ITEMS_TABLE} (pk, sk, attributes, expire_at) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (pk, sk) DO UPDATE SET attributes = EXCLUDED.attributes, expire_at = EXCLUDED.expire_at`,
+    [item.id, item.createdDate, JSON.stringify(item), expire_at],
   );
 
   return item;
@@ -37,108 +31,74 @@ export const createChat = async (_userId: string): Promise<Chat> => {
 export const findChatById = async (_userId: string, _chatId: string): Promise<Chat | null> => {
   const userId = `user#${_userId}`;
   const chatId = `chat#${_chatId}`;
-  const res = await dynamoDbDocument.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: '#id = :id',
-      FilterExpression: '#chatId = :chatId',
-      ExpressionAttributeNames: {
-        '#id': 'id',
-        '#chatId': 'chatId',
-      },
-      ExpressionAttributeValues: {
-        ':id': userId,
-        ':chatId': chatId,
-      },
-    }),
+  const res = await getDb().query(
+    `SELECT attributes FROM ${ITEMS_TABLE} WHERE pk = $1 AND attributes->>'chatId' = $2 LIMIT 1`,
+    [userId, chatId],
   );
 
-  if (!res.Items || res.Items.length === 0) {
+  if (res.rows.length === 0) {
     return null;
-  } else {
-    return res.Items[0] as Chat;
   }
+  return res.rows[0].attributes as Chat;
 };
 
 export const listChats = async (
   _userId: string,
   _exclusiveStartKey?: string,
 ): Promise<ListChatsResponse> => {
-  const exclusiveStartKey = _exclusiveStartKey
-    ? JSON.parse(Buffer.from(_exclusiveStartKey, 'base64').toString())
-    : undefined;
   const userId = `user#${_userId}`;
-  const res = await dynamoDbDocument.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: '#id = :id',
-      ExpressionAttributeNames: {
-        '#id': 'id',
-      },
-      ExpressionAttributeValues: {
-        ':id': userId,
-      },
-      ScanIndexForward: false,
-      Limit: 100, // チャットのリストは 1 度に 100 件返す
-      ExclusiveStartKey: exclusiveStartKey,
-    }),
+  // DynamoDB の LastEvaluatedKey 相当。sk（createdDate）のキーセットページネーション。
+  const exclusiveStartKey = _exclusiveStartKey
+    ? (JSON.parse(Buffer.from(_exclusiveStartKey, 'base64').toString()) as { sk: string })
+    : undefined;
+
+  const params: unknown[] = [userId];
+  let where = 'pk = $1';
+  if (exclusiveStartKey) {
+    params.push(exclusiveStartKey.sk);
+    where += ` AND sk < $${params.length}`;
+  }
+  params.push(LIST_CHATS_LIMIT);
+
+  const res = await getDb().query(
+    `SELECT sk, attributes FROM ${ITEMS_TABLE} WHERE ${where} ORDER BY sk COLLATE "C" DESC LIMIT $${params.length}`,
+    params,
   );
 
+  const lastRow = res.rows.length === LIST_CHATS_LIMIT ? res.rows[res.rows.length - 1] : undefined;
+
   return {
-    data: res.Items as Chat[],
-    lastEvaluatedKey: res.LastEvaluatedKey
-      ? Buffer.from(JSON.stringify(res.LastEvaluatedKey)).toString('base64')
+    data: res.rows.map((row) => row.attributes as Chat),
+    lastEvaluatedKey: lastRow
+      ? Buffer.from(JSON.stringify({ sk: lastRow.sk })).toString('base64')
       : undefined,
   };
 };
 
 export const setChatTitle = async (id: string, createdDate: string, title: string) => {
-  const res = await dynamoDbDocument.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        id: id,
-        createdDate: createdDate,
-      },
-      UpdateExpression: 'set title = :title',
-      ExpressionAttributeValues: {
-        ':title': title,
-      },
-      ReturnValues: 'ALL_NEW',
-    }),
+  const res = await getDb().query(
+    `UPDATE ${ITEMS_TABLE}
+     SET attributes = attributes || jsonb_build_object('title', $3::text)
+     WHERE pk = $1 AND sk = $2
+     RETURNING attributes`,
+    [id, createdDate, title],
   );
-  return res.Attributes as Chat;
+  return res.rows[0]?.attributes as Chat;
 };
 
 export const deleteChat = async (_userId: string, _chatId: string): Promise<void> => {
   // Chat の削除
   const chatItem = await findChatById(_userId, _chatId);
-  await dynamoDbDocument.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        id: chatItem?.id,
-        createdDate: chatItem?.createdDate,
-      },
-    }),
-  );
+  if (chatItem) {
+    await getDb().query(`DELETE FROM ${ITEMS_TABLE} WHERE pk = $1 AND sk = $2`, [
+      chatItem.id,
+      chatItem.createdDate,
+    ]);
+  }
 
-  // // Message の削除
+  // Message の削除（メッセージは pk = chat#chatId で保存されている）
   const messageItems = await listMessages(_chatId);
-  await dynamoDbDocument.send(
-    new BatchWriteCommand({
-      RequestItems: {
-        [TABLE_NAME]: messageItems.map((m) => {
-          return {
-            DeleteRequest: {
-              Key: {
-                id: m.id,
-                createdDate: m.createdDate,
-              },
-            },
-          };
-        }),
-      },
-    }),
-  );
+  if (messageItems.length > 0) {
+    await getDb().query(`DELETE FROM ${ITEMS_TABLE} WHERE pk = $1`, [`chat#${_chatId}`]);
+  }
 };

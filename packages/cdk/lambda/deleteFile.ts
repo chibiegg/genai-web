@@ -1,5 +1,6 @@
-import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { createApiHandler } from './utils/createApiHandler';
+import { getS3Client } from './utils/s3Client';
 import { authorizeOwnedKey, resolveRequestIdentityId } from './utils/fileOwnership';
 import { HttpError } from './utils/httpError';
 import { requirePathParam } from './utils/requirePathParam';
@@ -14,7 +15,7 @@ export const handler = createApiHandler(async (event) => {
     throw new HttpError(403, 'Access denied: You can only delete your own files');
   }
 
-  const client = new S3Client({});
+  const client = getS3Client();
   const command = new DeleteObjectCommand({
     Bucket: process.env.BUCKET_NAME,
     Key: fileName,

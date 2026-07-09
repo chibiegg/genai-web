@@ -1,0 +1,45 @@
+{
+  "realm": "genai",
+  "enabled": true,
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "loginTheme": "keycloak",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["ja", "en"],
+  "defaultLocale": "ja",
+  "clients": [
+    {
+      "clientId": "genai-web",
+      "name": "源内 Web",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:5173/*", "http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:5173", "http://localhost:3000"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      },
+      "defaultClientScopes": ["basic", "profile", "email"]
+    }
+  ],
+  "users": [
+    {
+      "username": "dev-user",
+      "email": "dev-user@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Dev",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-password",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

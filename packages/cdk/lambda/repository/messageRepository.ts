@@ -1,23 +1,14 @@
-import { BatchWriteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { RecordedMessage, ToBeRecordedMessage } from 'genai-web';
-import { dynamoDbDocument, TABLE_NAME, TTL_DAYS } from './client';
+import { calcExpireAt, getDb, ITEMS_TABLE } from './db';
 
 export const listMessages = async (_chatId: string): Promise<RecordedMessage[]> => {
   const chatId = `chat#${_chatId}`;
-  const res = await dynamoDbDocument.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: '#id = :id',
-      ExpressionAttributeNames: {
-        '#id': 'id',
-      },
-      ExpressionAttributeValues: {
-        ':id': chatId,
-      },
-    }),
+  const res = await getDb().query(
+    `SELECT attributes FROM ${ITEMS_TABLE} WHERE pk = $1 ORDER BY sk COLLATE "C" ASC`,
+    [chatId],
   );
 
-  return res.Items as RecordedMessage[];
+  return res.rows.map((row) => row.attributes as RecordedMessage);
 };
 
 export const batchCreateMessages = async (
@@ -29,10 +20,10 @@ export const batchCreateMessages = async (
   const chatId = `chat#${_chatId}`;
   const createdDate = Date.now();
   const feedback = 'none';
-  const expire_at = Math.floor(Date.now() / 1000) + TTL_DAYS * 24 * 60 * 60;
+  const expire_at = calcExpireAt();
 
   const items: RecordedMessage[] = messages.map((m: ToBeRecordedMessage, i: number) => {
-    // 配列が存在し非空のときだけ Item に含める。金額値（number 型）はそのまま DDB に保存される。
+    // 配列が存在し非空のときだけ Item に含める。金額値（number 型）はそのまま保存される。
     const usageCostHistory =
       Array.isArray(m.usageCostHistory) && m.usageCostHistory.length > 0
         ? m.usageCostHistory
@@ -53,19 +44,16 @@ export const batchCreateMessages = async (
       ...(usageCostHistory !== undefined ? { usageCostHistory } : {}),
     };
   });
-  await dynamoDbDocument.send(
-    new BatchWriteCommand({
-      RequestItems: {
-        [TABLE_NAME]: items.map((m) => {
-          return {
-            PutRequest: {
-              Item: m,
-            },
-          };
-        }),
-      },
-    }),
-  );
+
+  // DynamoDB BatchWrite(Put) と同じく upsert セマンティクスで書き込む
+  const db = getDb();
+  for (const item of items) {
+    await db.query(
+      `INSERT INTO ${ITEMS_TABLE} (pk, sk, attributes, expire_at) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (pk, sk) DO UPDATE SET attributes = EXCLUDED.attributes, expire_at = EXCLUDED.expire_at`,
+      [item.id, item.createdDate, JSON.stringify(item), expire_at],
+    );
+  }
 
   return items;
 };

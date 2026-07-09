@@ -1,6 +1,7 @@
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createApiHandler } from './utils/createApiHandler';
+import { getS3Client } from './utils/s3Client';
 import { authorizeOwnedKey, resolveRequestIdentityId } from './utils/fileOwnership';
 import { HttpError } from './utils/httpError';
 import { requireQueryParam } from './utils/requireQueryParam';
@@ -21,7 +22,7 @@ export const handler = createApiHandler(async (event) => {
     throw new HttpError(403, 'Access denied: You can only access your own files');
   }
 
-  const client = new S3Client({});
+  const client = getS3Client();
 
   const command = new GetObjectCommand({
     Bucket: bucketName,

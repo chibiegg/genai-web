@@ -1,19 +1,22 @@
-// client.ts は import 時に process.env.TABLE_NAME を解決するため、
-// vi.hoisted で import 前に env を設定する。
+// リポジトリ層は PostgreSQL 実装のため、PGlite（WASM 版 PostgreSQL）で実挙動を検証する。
 import { vi } from 'vitest';
 vi.hoisted(() => {
-  process.env.TABLE_NAME = 'test-table';
   process.env.TTL_DAYS = '30';
 });
 
-import { BatchWriteCommand, DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-import { mockClient } from 'aws-sdk-client-mock';
+import { PGlite } from '@electric-sql/pglite';
 import type { ToBeRecordedMessage, UsageCostEntry } from 'genai-web';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { batchCreateMessages } from '../../../lambda/repository/messageRepository';
-import { TABLE_NAME } from '../../../lambda/repository/client';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { ensureSchema, ITEMS_TABLE, setQueryExecutor } from '../../../lambda/repository/db';
+import { batchCreateMessages, listMessages } from '../../../lambda/repository/messageRepository';
 
-const ddbMock = mockClient(DynamoDBDocumentClient);
+const pglite = new PGlite();
+const executor = {
+  query: async (text: string, params?: unknown[]) => {
+    const res = await pglite.query(text, params as never[]);
+    return { rows: res.rows as Record<string, unknown>[] };
+  },
+};
 
 const baseMessage: ToBeRecordedMessage = {
   role: 'assistant',
@@ -33,22 +36,17 @@ const usageEntry: UsageCostEntry = {
 };
 
 describe('messageRepository.batchCreateMessages', () => {
-  beforeEach(() => {
-    ddbMock.reset();
-    ddbMock.on(BatchWriteCommand).resolves({});
+  beforeEach(async () => {
+    setQueryExecutor(executor);
+    await ensureSchema(executor);
+    await executor.query(`DELETE FROM ${ITEMS_TABLE}`);
   });
 
-  const getPutItems = (): Record<string, unknown>[] => {
-    const calls = ddbMock.commandCalls(BatchWriteCommand);
-    expect(calls.length).toBeGreaterThan(0);
-    const requestItems = calls[0].args[0].input.RequestItems!;
-    // import 時に解決された TABLE_NAME を使う（テスト env 反映の保証）。
-    const tableRequests = requestItems[TABLE_NAME] as { PutRequest?: { Item: Record<string, unknown> } }[];
-    expect(tableRequests).toBeDefined();
-    return tableRequests.map((r) => r.PutRequest!.Item);
-  };
+  afterAll(() => {
+    setQueryExecutor(undefined);
+  });
 
-  it('usageCostHistory を含むメッセージは Item に当該フィールドが含まれる（金額は number 型）', async () => {
+  it('usageCostHistory を含むメッセージは保存後も当該フィールドが保持される（金額は number 型）', async () => {
     const messages: ToBeRecordedMessage[] = [
       {
         ...baseMessage,
@@ -57,27 +55,29 @@ describe('messageRepository.batchCreateMessages', () => {
     ];
     await batchCreateMessages(messages, 'user-1', 'chat-1');
 
-    const items = getPutItems();
-    expect(items[0].usageCostHistory).toEqual([usageEntry]);
-    // 金額は number 型のまま保持
-    const history = items[0].usageCostHistory as UsageCostEntry[];
+    const stored = await listMessages('chat-1');
+    expect(stored).toHaveLength(1);
+    expect(stored[0].usageCostHistory).toEqual([usageEntry]);
+    const history = stored[0].usageCostHistory as UsageCostEntry[];
     expect(typeof history[0].estimatedCost!.totalCost).toBe('number');
   });
 
   it('usageCostHistory が undefined の場合は属性ごと落として保存（後方互換）', async () => {
     const messages: ToBeRecordedMessage[] = [{ ...baseMessage }];
-    await batchCreateMessages(messages, 'user-1', 'chat-1');
-
-    const items = getPutItems();
+    const items = await batchCreateMessages(messages, 'user-1', 'chat-1');
     expect('usageCostHistory' in items[0]).toBe(false);
+
+    const stored = await listMessages('chat-1');
+    expect('usageCostHistory' in stored[0]).toBe(false);
   });
 
   it('usageCostHistory が空配列の場合は属性ごと落として保存', async () => {
     const messages: ToBeRecordedMessage[] = [{ ...baseMessage, usageCostHistory: [] }];
-    await batchCreateMessages(messages, 'user-1', 'chat-1');
-
-    const items = getPutItems();
+    const items = await batchCreateMessages(messages, 'user-1', 'chat-1');
     expect('usageCostHistory' in items[0]).toBe(false);
+
+    const stored = await listMessages('chat-1');
+    expect('usageCostHistory' in stored[0]).toBe(false);
   });
 
   it('複数 entry（continue/retry 想定）はすべて保存される', async () => {
@@ -90,7 +90,21 @@ describe('messageRepository.batchCreateMessages', () => {
     ];
     await batchCreateMessages(messages, 'user-1', 'chat-1');
 
-    const items = getPutItems();
-    expect(items[0].usageCostHistory).toEqual([usageEntry, second]);
+    const stored = await listMessages('chat-1');
+    expect(stored[0].usageCostHistory).toEqual([usageEntry, second]);
+  });
+
+  it('メッセージは chat#chatId 配下に createdDate 順で保存される', async () => {
+    const messages: ToBeRecordedMessage[] = [
+      { ...baseMessage, messageId: 'msg-1', createdDate: '100#0', content: 'old' },
+      { ...baseMessage, messageId: 'msg-2', createdDate: '200#0', content: 'new' },
+    ];
+    const items = await batchCreateMessages(messages, 'user-1', 'chat-2');
+    expect(items[0].id).toBe('chat#chat-2');
+    expect(items[0].userId).toBe('user#user-1');
+    expect(items[0].feedback).toBe('none');
+
+    const stored = await listMessages('chat-2');
+    expect(stored.map((m) => m.createdDate)).toEqual(['100#0', '200#0']);
   });
 });

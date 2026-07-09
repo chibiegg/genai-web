@@ -1,7 +1,8 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { GetFileUploadSignedUrlRequest } from 'genai-web';
 import { createApiHandler } from './utils/createApiHandler';
+import { getS3Client } from './utils/s3Client';
 import { resolveRequestIdentityId } from './utils/fileOwnership';
 import { parseJsonBody } from './utils/parseJsonBody';
 
@@ -12,7 +13,7 @@ export const handler = createApiHandler(async (event) => {
   const identityId = await resolveRequestIdentityId(event);
   const uuid = crypto.randomUUID();
 
-  const client = new S3Client({});
+  const client = getS3Client();
 
   const command = new PutObjectCommand({
     Bucket: process.env.BUCKET_NAME,
