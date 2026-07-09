@@ -77,6 +77,17 @@ CREATE TABLE IF NOT EXISTS exapp_jobs (
   done BOOLEAN NOT NULL DEFAULT FALSE
 );
 CREATE INDEX IF NOT EXISTS idx_exapp_jobs_pending ON exapp_jobs (next_poll_at) WHERE NOT done;
+
+-- 文字起こしジョブ（Amazon Transcribe の代替。AI Engine の Whisper 互換 API を使用）
+CREATE TABLE IF NOT EXISTS transcribe_jobs (
+  job_name TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  language_code TEXT NOT NULL DEFAULT 'ja-JP',
+  transcripts JSONB,
+  error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 `;
 
 export const ensureTeamSchema = async (db: QueryExecutor = getDb()): Promise<void> => {

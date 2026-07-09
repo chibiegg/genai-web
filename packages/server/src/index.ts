@@ -40,6 +40,7 @@ import { adapt, buildEvent, LambdaHandler } from './adapter';
 import { authMiddleware } from './auth';
 import { exAppsRoutes, startExAppWorker } from './routes/exapps';
 import { teamsRoutes } from './routes/teams';
+import { transcribeRoutes } from './routes/transcribe';
 import { ensureTeamSchema } from './teamSchema';
 
 const app = new Hono();
@@ -113,6 +114,9 @@ api.delete('/file/:fileName', adapt(deleteFile as LambdaHandler));
 // チーム管理・AIアプリ管理・AIアプリ実行（クリーンルーム実装）
 api.route('/', teamsRoutes);
 api.route('/', exAppsRoutes);
+
+// 文字起こし（AI Engine の Whisper 互換 API）
+api.route('/', transcribeRoutes);
 
 app.route('/', api);
 
