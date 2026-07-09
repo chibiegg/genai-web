@@ -9,6 +9,7 @@ export type AuthClaims = Record<string, string>;
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 let cachedIssuer: string | undefined;
 
+// トークンの iss クレーム検証に使う issuer（＝ブラウザが IdP にアクセスする URL）
 const getIssuer = (): string => {
   const issuer = process.env.OIDC_ISSUER;
   if (!issuer) {
@@ -17,11 +18,20 @@ const getIssuer = (): string => {
   return issuer.replace(/\/+$/, '');
 };
 
+// OIDC ディスカバリ／JWKS を取得する URL。
+// Docker 構成では、ブラウザが使う issuer（localhost:8180）と API コンテナから
+// Keycloak に到達する URL（keycloak:8180）が異なるため、OIDC_INTERNAL_ISSUER で
+// 内部向けの URL を指定できるようにする（未指定なら OIDC_ISSUER と同じ）。
+const getInternalIssuer = (): string => {
+  const internal = process.env.OIDC_INTERNAL_ISSUER;
+  return (internal ?? getIssuer()).replace(/\/+$/, '');
+};
+
 const getJwks = async (): Promise<ReturnType<typeof createRemoteJWKSet>> => {
-  const issuer = getIssuer();
-  if (!jwks || cachedIssuer !== issuer) {
+  const internalIssuer = getInternalIssuer();
+  if (!jwks || cachedIssuer !== internalIssuer) {
     // OIDC ディスカバリから jwks_uri を取得する（Keycloak 以外の IdP でも動くように）
-    const res = await fetch(`${issuer}/.well-known/openid-configuration`);
+    const res = await fetch(`${internalIssuer}/.well-known/openid-configuration`);
     if (!res.ok) {
       throw new Error(`Failed to fetch OIDC discovery document: ${res.status}`);
     }
@@ -30,7 +40,7 @@ const getJwks = async (): Promise<ReturnType<typeof createRemoteJWKSet>> => {
       throw new Error('OIDC discovery document does not contain jwks_uri');
     }
     jwks = createRemoteJWKSet(new URL(discovery.jwks_uri));
-    cachedIssuer = issuer;
+    cachedIssuer = internalIssuer;
   }
   return jwks;
 };
