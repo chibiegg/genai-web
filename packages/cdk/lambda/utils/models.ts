@@ -6,7 +6,7 @@ import {
   ConverseStreamCommandInput,
   ConverseStreamOutput,
 } from '@aws-sdk/client-bedrock-runtime';
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { modelMetadata } from '@genai-web/common';
 import {
   AmazonAdvancedImageParams,
@@ -26,6 +26,7 @@ import {
   UsecaseConverseInferenceParams,
 } from 'genai-web';
 import { toSafeDocumentName } from './fileNameUtils';
+import { getS3Client } from './s3Client';
 import { authorizeOwnedKey } from './fileOwnership';
 import { FileRetrievalError, parseS3Uri } from './s3Uri';
 
@@ -40,12 +41,17 @@ export const modelIds: string[] = (JSON.parse(process.env.MODEL_IDS || '[]') as 
   .map((modelId: string) => modelId.trim())
   .filter((modelId: string) => modelId);
 // 利用できるモデルの中で軽量モデルがあれば軽量モデルを優先する。
+// metadata 未登録のモデル ID が MODEL_IDS に含まれていても落ちないよう optional chaining にする。
 const lightWeightModelIds = modelIds.filter(
-  (modelId: string) => modelMetadata[modelId].flags.light,
+  (modelId: string) => modelMetadata[modelId]?.flags?.light,
 );
 const defaultModelId = lightWeightModelIds[0] || modelIds[0];
+// MODEL_PROVIDER でテキスト生成のプロバイダを切り替える（既定: bedrock）。
+// 'sakura' を指定すると、さくらのAI Engine（OpenAI 互換 API）を利用する。
+export const modelProvider: Model['type'] =
+  process.env.MODEL_PROVIDER === 'sakura' ? 'sakura' : 'bedrock';
 export const defaultModel: Model = {
-  type: 'bedrock',
+  type: modelProvider,
   modelId: defaultModelId,
 };
 
@@ -283,14 +289,6 @@ export const appendCachePointToConversation = <
 };
 
 // API の呼び出しや、出力から文字列を抽出、などの処理
-
-let s3Client: S3Client | undefined;
-const getS3Client = (): S3Client => {
-  if (!s3Client) {
-    s3Client = new S3Client({});
-  }
-  return s3Client;
-};
 
 // 会話履歴の全 extraData のうち、Converse に渡す対象（保持対象）を判定する。
 // document / image は新しいメッセージ順（配列末尾優先）で最新 N 件のみ true、

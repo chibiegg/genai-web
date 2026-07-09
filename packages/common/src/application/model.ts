@@ -26,6 +26,22 @@ const MODEL_FEATURE: Record<string, FeatureFlags> = {
 
 export const modelMetadata: Record<string, ModelMetadata> = {
   // ==== Text ===
+  // さくらのAI Engine（OpenAI 互換 API）
+  'preview/Kimi-K2.6': {
+    flags: MODEL_FEATURE.TEXT_DOC,
+    displayName: 'Kimi K2.6',
+    description: '高性能モデル。日本語・長文・複雑な推論向き',
+  },
+  'preview/Qwen3.6-35B-A3B': {
+    flags: { ...MODEL_FEATURE.TEXT_DOC, ...MODEL_FEATURE.LIGHT },
+    displayName: 'Qwen3.6 35B',
+    description: '高速・低コスト。分類などの定型処理が得意',
+  },
+  'Qwen3-Coder-480B-A35B-Instruct-FP8': {
+    flags: MODEL_FEATURE.TEXT_DOC,
+    displayName: 'Qwen3 Coder 480B',
+    description: 'コード生成・レビューなど開発タスク向き',
+  },
   // Anthropic
   'jp.anthropic.claude-haiku-4-5-20251001-v1:0': {
     flags: MODEL_FEATURE.TEXT_DOC_IMAGE_REASONING,

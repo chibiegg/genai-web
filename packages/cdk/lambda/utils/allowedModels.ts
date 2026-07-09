@@ -5,6 +5,7 @@ import {
   defaultModel,
   imageGenerationModelIds,
   modelIds,
+  modelProvider,
 } from './models';
 
 type RequestedModel = {
@@ -19,7 +20,7 @@ const allowedTextModelIds = new Set(modelIds);
 const allowedImageModelIds = new Set(imageGenerationModelIds);
 
 const isKnownModelType = (value: unknown): value is Model['type'] => {
-  return value === 'bedrock' || value === 'sagemaker';
+  return value === 'bedrock' || value === 'sagemaker' || value === 'sakura';
 };
 
 const isNonEmptyString = (value: unknown): value is string => {
@@ -47,8 +48,15 @@ const resolveRequestedModel = (requested: RequestedModel | undefined, fallback: 
 export const resolveAllowedTextModel = (requested?: RequestedModel): Model => {
   const model = resolveRequestedModel(requested, defaultModel);
 
+  // MODEL_PROVIDER=sakura の環境では、フロントエンドが type を旧値（bedrock）のまま
+  // 送信してきてもさくらのAI Engine に振り向ける（モデル ID の許可判定は共通）。
+  if (modelProvider === 'sakura' && model.type === 'bedrock') {
+    model.type = 'sakura';
+  }
+
   switch (model.type) {
     case 'bedrock':
+    case 'sakura':
       if (!allowedTextModelIds.has(model.modelId)) {
         return throwModelNotAllowed();
       }

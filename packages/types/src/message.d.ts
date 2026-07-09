@@ -4,7 +4,7 @@ import { EstimatedCostSummary } from './cost';
 export type Role = 'system' | 'user' | 'assistant';
 
 export type Model = {
-  type: 'bedrock' | 'sagemaker';
+  type: 'bedrock' | 'sagemaker' | 'sakura';
   modelId: string;
   sessionId?: string;
 };
