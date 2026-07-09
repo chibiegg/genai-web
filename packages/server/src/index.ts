@@ -38,6 +38,9 @@ import { handler as updateTitle } from '../../cdk/lambda/updateTitle';
 
 import { adapt, buildEvent, LambdaHandler } from './adapter';
 import { authMiddleware } from './auth';
+import { exAppsRoutes, startExAppWorker } from './routes/exapps';
+import { teamsRoutes } from './routes/teams';
+import { ensureTeamSchema } from './teamSchema';
 
 const app = new Hono();
 
@@ -107,6 +110,10 @@ api.post('/file/url', adapt(getFileUploadSignedUrl as LambdaHandler));
 api.get('/file/url', adapt(getFileDownloadSignedUrl as LambdaHandler));
 api.delete('/file/:fileName', adapt(deleteFile as LambdaHandler));
 
+// チーム管理・AIアプリ管理・AIアプリ実行（クリーンルーム実装）
+api.route('/', teamsRoutes);
+api.route('/', exAppsRoutes);
+
 app.route('/', api);
 
 const port = parseInt(process.env.PORT ?? '3001', 10);
@@ -114,6 +121,13 @@ const port = parseInt(process.env.PORT ?? '3001', 10);
 const main = async () => {
   // 起動時にスキーマを適用する（存在すれば no-op）
   await ensureSchema();
+  await ensureTeamSchema();
+  // 共通アプリチーム（全ユーザーが利用可能なアプリを配置するチーム）を作成する
+  const { createTeamWithId } = await import('./teamRepository');
+  const { COMMON_TEAM_ID } = await import('../../cdk/lambda/utils/constants');
+  await createTeamWithId(COMMON_TEAM_ID, '共通アプリチーム');
+  // AIアプリ非同期実行のポーリングワーカーを開始する
+  startExAppWorker();
   console.log(`genai-web server listening on :${port}`);
   serve({ fetch: app.fetch, port });
 };

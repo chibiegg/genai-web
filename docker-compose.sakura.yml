@@ -33,8 +33,8 @@ services:
     ports:
       - "8180:8180"
     volumes:
+      # 開発用（H2）のため永続化しない。レルム変更は realm-genai.json に反映すること。
       - ./docker/keycloak/realm-genai.json:/opt/keycloak/data/import/realm-genai.json:ro
-      - genai-keycloak:/opt/keycloak/data/h2
 
   minio:
     image: minio/minio:latest
@@ -97,5 +97,4 @@ services:
 
 volumes:
   genai-pgdata:
-  genai-keycloak:
   genai-minio:

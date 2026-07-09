@@ -46,6 +46,11 @@ export const verifyToken = async (token: string): Promise<AuthClaims> => {
   }
 
   // Cognito オーソライザの claims 形式に合わせる（ハンドラは claims['sub'] 等を参照する）
+  // グループは Keycloak の groups クレームまたはレルムロールからマッピングする
+  const groups =
+    (payload.groups as string[] | undefined) ??
+    (payload.realm_access as { roles?: string[] } | undefined)?.roles ??
+    [];
   const claims: AuthClaims = {
     sub: payload.sub,
     email: typeof payload.email === 'string' ? payload.email : '',
@@ -53,6 +58,7 @@ export const verifyToken = async (token: string): Promise<AuthClaims> => {
       typeof payload.preferred_username === 'string'
         ? payload.preferred_username
         : (payload.sub as string),
+    'cognito:groups': groups.map((g) => String(g).replace(/^\//, '')).join(','),
   };
   return claims;
 };

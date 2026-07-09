@@ -1,8 +1,20 @@
+import { User } from 'oidc-client-ts';
 import { ReactNode, useEffect, useState } from 'react';
 import { getUserManager } from '@/lib/auth';
 
 type Props = {
   children: ReactNode;
+};
+
+// React StrictMode では useEffect が2回実行されるため、認可コードの交換
+// （1回しか使えない）をモジュールレベルでシングルトン化して二重実行を防ぐ。
+let signinCallbackPromise: Promise<User | undefined> | undefined;
+
+const processSigninCallback = (): Promise<User | undefined> => {
+  if (!signinCallbackPromise) {
+    signinCallbackPromise = getUserManager().signinCallback() as Promise<User | undefined>;
+  }
+  return signinCallbackPromise;
 };
 
 // OIDC (Keycloak 等) の Authorization Code + PKCE フローで認証する。
@@ -19,7 +31,7 @@ export const AuthWithOidc = ({ children }: Props) => {
 
       // IdP からのリダイレクトコールバック
       if (params.has('code') && params.has('state')) {
-        const user = await um.signinCallback();
+        const user = await processSigninCallback();
         // クエリパラメータを除去（元のパスに戻す）
         const returnTo =
           user && typeof user.state === 'string' && user.state.startsWith('/')
