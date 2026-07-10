@@ -1,5 +1,5 @@
-// サービス名称
-export const APP_TITLE = '';
+// サービス名称（ページタイトル等に使用。環境変数で差し替え可能）
+export const APP_TITLE = import.meta.env.VITE_APP_TITLE ?? '';
 
 export const EXAPP_STATUS_OPTIONS = [
   { value: 'draft', label: '下書き' },

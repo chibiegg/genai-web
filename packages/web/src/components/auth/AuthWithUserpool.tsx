@@ -3,6 +3,7 @@ import { Amplify } from 'aws-amplify';
 import { type SignInInput, signIn } from 'aws-amplify/auth';
 import { I18n } from 'aws-amplify/utils';
 import React, { useEffect, useRef } from 'react';
+import { LOGO_TEXT } from '@/branding';
 import { APP_TITLE } from '@/constants';
 import {
   isCustomPasswordResetEnabled,
@@ -84,7 +85,7 @@ const AuthWithUserpoolContent = (props: Props) => {
             <>
               <PageTitle title={`サインイン${APP_TITLE ? ` | ${APP_TITLE}` : ''}`} />
               <h1 className='mt-8 mb-6 flex justify-center text-std-32B-150 text-solid-gray-900'>
-                ここにロゴが入る
+                {LOGO_TEXT}
               </h1>
             </>
           );
