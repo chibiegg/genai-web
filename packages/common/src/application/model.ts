@@ -42,6 +42,46 @@ export const modelMetadata: Record<string, ModelMetadata> = {
     displayName: 'Qwen3 Coder 480B',
     description: 'コード生成・レビューなど開発タスク向き',
   },
+  'Qwen3-Coder-30B-A3B-Instruct': {
+    flags: MODEL_FEATURE.TEXT_DOC,
+    displayName: 'Qwen3 Coder 30B',
+    description: 'コード向けの軽量モデル。高速な補完・変換向き',
+  },
+  'preview/Qwen3-VL-30B-A3B-Instruct': {
+    flags: MODEL_FEATURE.TEXT_DOC_IMAGE,
+    displayName: 'Qwen3 VL 30B',
+    description: '画像入力に対応したマルチモーダルモデル',
+  },
+  'gpt-oss-120b': {
+    flags: MODEL_FEATURE.TEXT_DOC,
+    displayName: 'GPT-OSS 120B',
+    description: 'オープンウェイトモデル。推論タスク向き',
+  },
+  'llm-jp-3.1-8x13b-instruct4': {
+    flags: MODEL_FEATURE.TEXT_DOC,
+    displayName: 'LLM-jp 3.1 8x13B',
+    description: 'LLM-jp プロジェクトによる国産の日本語特化モデル',
+  },
+  'preview/gemma-4-31B-it': {
+    flags: MODEL_FEATURE.TEXT_DOC,
+    displayName: 'Gemma 4 31B',
+    description: 'オープンモデル。バランス型',
+  },
+  'preview/Phi-4-multimodal-instruct': {
+    flags: MODEL_FEATURE.TEXT_DOC_IMAGE,
+    displayName: 'Phi-4 Multimodal',
+    description: '画像入力に対応した小型マルチモーダルモデル',
+  },
+  'preview/Phi-4-mini-instruct-cpu': {
+    flags: { ...MODEL_FEATURE.TEXT_DOC, ...MODEL_FEATURE.LIGHT },
+    displayName: 'Phi-4 Mini (CPU)',
+    description: 'CPU で動作する小型モデル。試験用',
+  },
+  'preview/Qwen3-0.6B-cpu': {
+    flags: { ...MODEL_FEATURE.TEXT_DOC, ...MODEL_FEATURE.LIGHT },
+    displayName: 'Qwen3 0.6B (CPU)',
+    description: 'CPU で動作する超小型モデル。試験用',
+  },
   // Anthropic
   'jp.anthropic.claude-haiku-4-5-20251001-v1:0': {
     flags: MODEL_FEATURE.TEXT_DOC_IMAGE_REASONING,
