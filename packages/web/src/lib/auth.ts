@@ -30,6 +30,9 @@ export const getUserManager = (): UserManager => {
     if (!issuer || !clientId) {
       throw new Error('VITE_APP_OIDC_ISSUER / VITE_APP_OIDC_CLIENT_ID が設定されていません。');
     }
+    // Keycloak の Identity Brokering で特定 IdP（GitHub 等）へ直行させる場合は
+    // VITE_APP_OIDC_IDP_HINT に IdP のエイリアスを設定する（kc_idp_hint）。
+    const idpHint = import.meta.env.VITE_APP_OIDC_IDP_HINT;
     userManager = new UserManager({
       authority: issuer,
       client_id: clientId,
@@ -38,6 +41,7 @@ export const getUserManager = (): UserManager => {
       scope: 'openid profile email',
       userStore: new WebStorageStateStore({ store: window.localStorage }),
       automaticSilentRenew: true,
+      ...(idpHint ? { extraQueryParams: { kc_idp_hint: idpHint } } : {}),
     });
   }
   return userManager;

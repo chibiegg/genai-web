@@ -7,6 +7,27 @@
   "internationalizationEnabled": true,
   "supportedLocales": ["ja", "en"],
   "defaultLocale": "ja",
+  "requiredActions": [
+    {
+      "alias": "TERMS_AND_CONDITIONS",
+      "name": "Terms and Conditions",
+      "providerId": "TERMS_AND_CONDITIONS",
+      "enabled": true,
+      "defaultAction": true,
+      "priority": 20,
+      "config": {}
+    }
+  ],
+  "localizationTexts": {
+    "ja": {
+      "termsTitle": "利用規約",
+      "termsText": "<p>利用規約が設定されていません。運営者は scripts/setup-terms.sh で規約文面を設定してください。</p>"
+    },
+    "en": {
+      "termsTitle": "Terms of Use",
+      "termsText": "<p>Terms have not been configured. The operator should set them via scripts/setup-terms.sh.</p>"
+    }
+  },
   "groups": [
     { "name": "SystemAdminGroup" },
     { "name": "TeamAdminGroup" },
@@ -53,6 +74,7 @@
       "enabled": true,
       "firstName": "Dev",
       "lastName": "User",
+      "requiredActions": [],
       "groups": ["SystemAdminGroup"],
       "credentials": [
         {
@@ -69,6 +91,7 @@
       "enabled": true,
       "firstName": "Dev",
       "lastName": "Member",
+      "requiredActions": [],
       "groups": ["UserGroup"],
       "credentials": [
         {
