@@ -3,14 +3,19 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig } from 'vite';
 
+// リバースプロキシ経由で独自ドメインからアクセスする場合に許可するホスト名。
+// dev サーバ・preview サーバの双方に適用する（カンマ区切り）。
+const allowedHosts = process.env.VITE_ALLOWED_HOSTS
+  ? process.env.VITE_ALLOWED_HOSTS.split(',')
+  : undefined;
+
 // https://vitejs.dev/config/
 export default defineConfig({
   server: {
-    // リバースプロキシ経由で独自ドメインから開発サーバへアクセスする場合に
-    // 許可するホスト名（カンマ区切り）。例: VITE_ALLOWED_HOSTS=demo.example.com
-    ...(process.env.VITE_ALLOWED_HOSTS
-      ? { allowedHosts: process.env.VITE_ALLOWED_HOSTS.split(',') }
-      : {}),
+    ...(allowedHosts ? { allowedHosts } : {}),
+  },
+  preview: {
+    ...(allowedHosts ? { allowedHosts } : {}),
   },
   resolve: {
     alias: {
