@@ -26,7 +26,7 @@ export const handler = createApiHandler(async (event) => {
   // 出力が <output></output> で囲まれる可能性がある
   // 以下の処理ではそれに対応するため、<output></output> を含む xml タグを削除している
   const title =
-    (await api['bedrock'].invoke?.(model, messages, req.id))?.replace(
+    (await api[model.type].invoke?.(model, messages, req.id))?.replace(
       /<([^>]+)>([\s\S]*?)<\/\1>/,
       '$2',
     ) ?? '';

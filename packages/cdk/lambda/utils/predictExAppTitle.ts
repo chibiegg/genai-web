@@ -22,7 +22,8 @@ export const predictExAppTitle = async (
 
     const messages: UnrecordedMessage[] = [{ role: 'user', content: prompt }];
 
-    const raw = (await api['bedrock'].invoke?.(defaultModel, messages, '/exapp-title')) ?? '';
+    const raw =
+      (await api[defaultModel.type].invoke?.(defaultModel, messages, '/exapp-title')) ?? '';
     const match = raw.match(/<output>([\s\S]*?)<\/output>/);
     const title = match ? match[1] : raw;
 
